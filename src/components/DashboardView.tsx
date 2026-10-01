@@ -12,7 +12,9 @@ import {
   Filter,
   Activity,
   Layers,
-  Sparkles
+  Sparkles,
+  Download,
+  Check
 } from 'lucide-react';
 import { TokenRecord, ApiActivityItem } from '../services/api';
 
@@ -31,6 +33,84 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'rate_limited'>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportedSuccess, setExportedSuccess] = useState(false);
+
+  const filteredActivity = activity.filter((item) => {
+    const matchesSearch = 
+      item.endpoint.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.model && item.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      item.statusText.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = 
+      statusFilter === 'all' ? true :
+      statusFilter === 'success' ? item.status < 400 :
+      item.status === 429;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleExportCSV = () => {
+    if (filteredActivity.length === 0) return;
+
+    setIsExporting(true);
+
+    const headers = [
+      'Activity_ID',
+      'Timestamp_ISO',
+      'Timestamp_Local',
+      'Endpoint',
+      'HTTP_Method',
+      'Model_Action',
+      'Tokens_Deducted',
+      'Sanitized_Headers_Count',
+      'HTTP_Status',
+      'Status_Description',
+      'Latency_MS',
+      'Bearer_Token_ID'
+    ];
+
+    const escapeCsv = (val: any): string => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = filteredActivity.map((item) => [
+      escapeCsv(item.id),
+      escapeCsv(item.timestamp),
+      escapeCsv(new Date(item.timestamp).toLocaleString()),
+      escapeCsv(item.endpoint),
+      escapeCsv(item.method),
+      escapeCsv(item.model || 'System Admin'),
+      escapeCsv(item.tokensDeducted),
+      escapeCsv(item.sanitizedHeadersCount),
+      escapeCsv(item.status),
+      escapeCsv(item.statusText),
+      escapeCsv(item.latencyMs),
+      escapeCsv(token ? token.maskedToken : 'N/A')
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((r) => r.join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestampStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `tokenbank-api-activity-${timestampStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setIsExporting(false);
+    setExportedSuccess(true);
+    setTimeout(() => setExportedSuccess(false), 2500);
+  };
 
   if (!token) {
     return (
@@ -59,20 +139,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const dailyPercent = token.dailyLimit && token.dailyLimit > 0
     ? Math.min(100, Math.round((token.dailyUsed / token.dailyLimit) * 100))
     : 0;
-
-  const filteredActivity = activity.filter((item) => {
-    const matchesSearch = 
-      item.endpoint.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.model && item.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      item.statusText.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = 
-      statusFilter === 'all' ? true :
-      statusFilter === 'success' ? item.status < 400 :
-      item.status === 429;
-
-    return matchesSearch && matchesStatus;
-  });
 
   return (
     <div className="space-y-6">
@@ -291,6 +357,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 429 Cap
               </button>
             </div>
+
+            {/* Export CSV Button */}
+            <button
+              onClick={handleExportCSV}
+              disabled={filteredActivity.length === 0 || isExporting}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                exportedSuccess
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-neutral-950 hover:bg-neutral-850 text-neutral-300 hover:text-white border-neutral-800 disabled:opacity-40 disabled:pointer-events-none'
+              }`}
+              title="Export filtered activity logs as CSV file for auditing"
+            >
+              {exportedSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Exported!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 text-neutral-400" />
+                  <span>Export CSV</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
