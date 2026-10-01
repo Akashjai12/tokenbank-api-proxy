@@ -1,0 +1,6 @@
+{
+  "name": "Anonymous Token Bank & API Proxy",
+  "description": "Production-grade Anonymous Token Bank and LLM Privacy Proxy with atomic Redis Lua reservations, header sanitization, and quota enforcement.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
