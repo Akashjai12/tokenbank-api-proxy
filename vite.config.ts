@@ -3,25 +3,12 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {fileURLToPath} from 'url';
 import {defineConfig} from 'vite';
-import dotenv from 'dotenv';
-import apiApp from './server/apiRouter.ts';
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(() => {
   return {
-    plugins: [
-      react(),
-      tailwindcss(),
-      {
-        name: 'token-bank-api',
-        configureServer(server) {
-          server.middlewares.use(apiApp);
-        },
-      },
-    ],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -36,5 +23,6 @@ export default defineConfig(() => {
     },
   };
 });
+
 
 
